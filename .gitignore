@@ -1,0 +1,14 @@
+*~
+.DS_Store
+
+# pycache
+__pycache__/
+
+# virtual environment
+venv/
+
+# build files & directories
+build/
+dist/
+MANIFEST
+ydata.egg-info
