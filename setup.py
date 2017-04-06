@@ -1,6 +1,6 @@
 # setup.py
 from setuptools import setup, find_packages
-setup(name='ydata',
+setup(name='yata',
       version='0.1',
       description='Data loader for deep learning',
       author='Yu Yin',

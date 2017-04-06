@@ -1,6 +1,6 @@
 import re
-from ydata import DataSource, DataLoader, \
-    Numeral, Words, Categorical, Chars, Converter
+from yata.loaders import TableLoader, DataLoader
+from yata.fields import Numeral, Words, Categorical, Chars, Converter
 
 
 def get_key(line):
@@ -24,14 +24,14 @@ if __name__ == '__main__':
     char = char_cat(Chars(10, '#'))
     label = Numeral('int32')
 
-    data1 = DataSource('test.table', key='id',
-                       fields={'label': label,
-                               'content->words': text})
+    data1 = TableLoader('test.table', key='id',
+                        fields={'label': label,
+                                'content->words': text})
 
-    data2 = DataSource('headless.table', with_header=False,
-                       key=get_key,
-                       fields={'0->lc,rc':
-                               char(Converter(get_context))})
+    data2 = TableLoader('headless.table', with_header=False,
+                        key=get_key,
+                        fields={'0->lc,rc':
+                                char(Converter(get_context))})
 
     loader = DataLoader(data1, data2)
 

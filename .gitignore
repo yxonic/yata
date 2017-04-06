@@ -11,4 +11,4 @@ venv/
 build/
 dist/
 MANIFEST
-ydata.egg-info
+yata.egg-info

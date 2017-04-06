@@ -8,19 +8,19 @@ import numpy as np
 from six import get_function_code
 
 
-class BaseConverter:
+class Field:
     def __init__(self, func):
         self._processor = func
 
     def __call__(self, other):
-        return BaseConverter(lambda k, p:
-                             self._processor(k, other._processor(k, p)))
+        return Field(lambda k, p:
+                     self._processor(k, other._processor(k, p)))
 
     def apply(self, key, item):
         return self._processor(key, item)
 
 
-class Converter(BaseConverter):
+class Converter(Field):
     def __init__(self, func):
         if get_function_code(func).co_argcount == 1:
             self._processor = foreach(lambda _, x: func(x))
@@ -28,7 +28,7 @@ class Converter(BaseConverter):
             self._processor = foreach(func)
 
 
-class Numeral(BaseConverter):
+class Numeral(Field):
     def __init__(self, dtype=None):
         if dtype is None:
             self.dtype = 'float32'
@@ -37,10 +37,11 @@ class Numeral(BaseConverter):
         self._processor = foreach(lambda _, x: np.asarray(x, dtype=self.dtype))
 
 
-class Categorical(BaseConverter):
+class Categorical(Field):
     def __init__(self, null='<NULL>'):
         self._items = [null]
         self._map = {null: 0}
+        self._fixed = False
         self._processor = foreach(lambda _, x: self.to_categorical(x))
 
     @foreach
@@ -48,10 +49,13 @@ class Categorical(BaseConverter):
         try:
             return self._map[item]
         except KeyError:
-            i = len(self._items)
-            self._items.append(item)
-            self._map[item] = i
-            return i
+            if self._fixed:
+                return 0  # for null
+            else:
+                i = len(self._items)
+                self._items.append(item)
+                self._map[item] = i
+                return i
 
     @foreach
     def get_original(self, cat):
@@ -64,8 +68,14 @@ class Categorical(BaseConverter):
     def items(self):
         return self._items
 
+    def load_dict(self, items):
+        self._items = items
+        for i, w in enumerate(self._items):
+            self._map[w] = i
+        self._fixed = True
 
-class Words(BaseConverter):
+
+class Words(Field):
     def __init__(self, sep, length=None, null='<NULL>'):
         if length is None:
             self._processor = foreach(lambda _, x: str(x).split(sep))
@@ -79,7 +89,7 @@ class Words(BaseConverter):
             self._processor = foreach(check)
 
 
-class Chars(BaseConverter):
+class Chars(Field):
     def __init__(self, length=None, null='<NULL>'):
         if length is None:
             self._processor = foreach(lambda _, x: list(str(x)))
