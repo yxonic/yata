@@ -17,7 +17,7 @@ def foreach(func):
                 not (isinstance(item, np.ndarray) and item.ndim == 0):
             rv = []
             for i in item:
-                rv.append(wrapper(*args[:-1], i))
+                rv.append(wrapper(*(args[:-1] + (i,))))
             return np.asarray(rv)
         else:
             return func(*args)

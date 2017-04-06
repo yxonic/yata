@@ -50,7 +50,7 @@ class DataLoader:
 
     def epoch(self, batch_size):
         total = len(self.keys)
-        N = math.ceil(total / batch_size)
+        N = int(math.ceil(total / batch_size))
 
         def loader():
             for i in range(N):
@@ -71,6 +71,10 @@ class DataLoader:
     @property
     def fields(self):
         return self._fields
+
+    @property
+    def size(self):
+        return len(self._keys)
 
 
 class TableLoader(DataLoader):
@@ -156,6 +160,6 @@ class TableLoader(DataLoader):
                         v[f] = result[i]
                 else:
                     v[new_field] = result
-        except Exception:
+        except Exception as e:
             return None
         return v
