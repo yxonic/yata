@@ -38,7 +38,7 @@ def _load(doc, key, converters, subset=None):
             before = after = field_map
 
         if subset is not None and \
-                len(set(before.split(',')) & set(subset)) == 0:
+                len(set(after.split(',')) & set(subset)) == 0:
             v.extend([None] * len(after.split(',')))
             continue
 
@@ -116,7 +116,6 @@ class BaseLoader(object, metaclass=ABCMeta):
 
             indices = self._indices.values()
             value_list = self.Index(*(list(unique(x)) for x in zip(*indices)))
-
             left_set = dict()
             right_set = dict()
             for on_ in on:
@@ -235,7 +234,9 @@ class TableLoader(BaseLoader):
         self._Index = namedtuple('Index', index)
         self._loc = {}
         for i, doc in self._table.iterrows():
-            if callable(key):
+            if key is None:
+                self.__add_doc(i, i, doc)
+            elif callable(key):
                 k_ = key(doc)
                 if isinstance(k_, Iterable):
                     for k in k_:
@@ -286,7 +287,6 @@ class DirectoryLoader(BaseLoader):
         for filename in files:
             for match in pattern.finditer(filename):
                 doc = match.groupdict()
-                print(doc)
                 key = doc['key']
                 self._keys.append(key)
                 del doc['key']
