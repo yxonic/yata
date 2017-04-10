@@ -1,4 +1,4 @@
-'''Contains utilies for data manipulation.'''
+"""Contains utilies for data manipulation."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 
 import functools
 from collections import Iterable
-from itertools import filterfalse
+from six.moves import filterfalse
 import numpy as np
 
 
@@ -28,7 +28,7 @@ def foreach(func):
 
 
 def unique(iterable, key=None):
-    '''List unique elements, preserving order.'''
+    """List unique elements, preserving order."""
     seen = set()
     seen_add = seen.add
     if key is None:

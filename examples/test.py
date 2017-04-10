@@ -13,7 +13,7 @@ def get_context(key, line):
     line = re.sub('<[a-z0-9\\-]+>', '', line)
     left = re.findall('(.{0,10})###', line)[0]
     right = re.findall('###(.{0,10})', line)[0]
-    return (left, right)
+    return left, right
 
 
 def main():

@@ -12,3 +12,5 @@ build/
 dist/
 MANIFEST
 yata.egg-info
+
+.idea/

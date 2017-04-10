@@ -9,12 +9,13 @@ from six import get_function_code
 
 
 class Field:
-    def __init__(self, func):
-        self._processor = func
+    _processor = None
 
     def __call__(self, other):
-        return Field(lambda k, p:
-                     self._processor(k, other._processor(k, p)))
+        f = Field()
+        f._processor = lambda k, p: \
+            self._processor(k, other._processor(k, p))
+        return f
 
     def apply(self, key, item):
         return self._processor(key, item)
@@ -90,6 +91,7 @@ class Words(Field):
                     return rv[:length]
                 else:
                     return rv + [null] * (length - len(rv))
+
             self._processor = foreach(check)
 
 
@@ -104,6 +106,7 @@ class Chars(Field):
                     return rv[:length]
                 else:
                     return rv + [null] * (length - len(rv))
+
             self._processor = foreach(check)
 
 
@@ -116,10 +119,10 @@ class Image(Field):
     def __init__(self, shape=None):
         from PIL import Image
 
-        def open(file):
+        def open_image(file):
             im = Image.open(file)
             if shape is not None:
                 im = im.resize(shape)
             return im
 
-        self._processor = foreach(lambda _, file: open(file))
+        self._processor = foreach(lambda _, file: open_image(file))

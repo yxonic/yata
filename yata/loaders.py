@@ -1,5 +1,5 @@
-'''Contains data loader classes.
-'''
+"""Contains data loader classes.
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -59,12 +59,13 @@ def _load(doc, key, converters, subset=None):
     return v
 
 
-class BaseLoader(object, metaclass=ABCMeta):
-    def __init__(self):
-        self._keys = []
-        self._indices = OrderedDict()
+class BaseLoader(object):
+    __metaclass__ = ABCMeta
 
     def get(self, key):
+        """
+        :rtype: Item
+        """
         if key not in self.keys:
             raise KeyError(key)
         return self._get(key)
@@ -73,14 +74,14 @@ class BaseLoader(object, metaclass=ABCMeta):
     def _get(self, key): pass
 
     def epoch(self, batch_size):
-        N = int(math.ceil(self.size / batch_size))
+        n = int(math.ceil(self.size / batch_size))
 
         def loader():
-            for i in range(N):
+            for i in range(n):
                 keys = self.keys[i*batch_size:(i+1)*batch_size]
                 rv = defaultdict(list)
-                for k in keys:
-                    data = self.get(k)
+                for key in keys:
+                    data = self.get(key)
                     for k, v in data._asdict().items():
                         rv[k].append(np.asarray(v))
                 yield keys, {k: np.asarray(rv[k]) for k in rv}
@@ -89,8 +90,8 @@ class BaseLoader(object, metaclass=ABCMeta):
 
     def sample(self, frac):
         rv = copy.copy(self)
-        N = int(math.ceil(len(self.keys) * frac))
-        rv._keys = random.sample(self.keys, N)
+        n = int(math.ceil(len(self.keys) * frac))
+        rv._keys = random.sample(self.keys, n)
         rv._indices = OrderedDict()
         for k in rv.keys:
             rv._indices[k] = self._indices[k]
@@ -104,9 +105,9 @@ class BaseLoader(object, metaclass=ABCMeta):
         right = copy.copy(self)
 
         if on is None:
-            N = int(len(self.keys) * frac)
-            left._keys = self._keys[:N]
-            right._keys = self._keys[N:]
+            n = int(len(self.keys) * frac)
+            left._keys = self._keys[:n]
+            right._keys = self._keys[n:]
         else:
             if not isinstance(on, Iterable) or isinstance(on, str):
                 on = (on, )
@@ -119,11 +120,11 @@ class BaseLoader(object, metaclass=ABCMeta):
             left_set = dict()
             right_set = dict()
             for on_ in on:
-                vlist = value_list.__getattribute__(on_)
-                N = int(math.ceil(len(vlist) * frac))
+                l = value_list.__getattribute__(on_)
+                n = int(math.ceil(len(l) * frac))
 
-                left_set[on_] = set(vlist[:N])
-                right_set[on_] = set(vlist[N:])
+                left_set[on_] = set(l[:n])
+                right_set[on_] = set(l[n:])
 
             left._keys = []
             right._keys = []
@@ -152,6 +153,7 @@ class BaseLoader(object, metaclass=ABCMeta):
     def size(self):
         return len(self.keys)
 
+    # noinspection PyPep8Naming
     @property
     def Item(self):
         if self._Item is None:
@@ -168,6 +170,7 @@ class BaseLoader(object, metaclass=ABCMeta):
     _Item = None
     _Index = None
 
+    # noinspection PyPep8Naming
     @property
     def Index(self):
         if self._Index is None:
@@ -178,7 +181,8 @@ class BaseLoader(object, metaclass=ABCMeta):
 
 class DataLoader(BaseLoader):
     def __init__(self, *args):
-        super().__init__()
+        super(DataLoader, self).__init__()
+        self._indices = OrderedDict()
         self._sources = args
 
         # merge metadata
@@ -212,9 +216,10 @@ class DataLoader(BaseLoader):
 
 
 class TableLoader(BaseLoader):
-    def __init__(self, file, with_header=True, ignore_error=False,
-                 key=None, fields=None, index=None):
-        super().__init__()
+    def __init__(self, file, with_header=True, key=None, fields=None, index=None):
+        super(TableLoader, self).__init__()
+        self._keys = []
+        self._indices = OrderedDict()
         if fields is None:
             fields = {}
         else:
@@ -269,7 +274,9 @@ class TableLoader(BaseLoader):
 
 class DirectoryLoader(BaseLoader):
     def __init__(self, dirname, fields=None, pattern=None):
-        super().__init__()
+        super(DirectoryLoader, self).__init__()
+        self._keys = []
+        self._indices = OrderedDict()
         if not isinstance(fields, dict):
             fields = {'file': fields, 'format': Converter}
         else:
