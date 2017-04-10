@@ -22,13 +22,28 @@ from .util import unique
 
 
 def _make_item_class(converters):
+    """
+    Make item type according to field mapping rules
+    :rtype: type
+    :param converters: Field mapping rules
+    :return: namedtuple type Item
+    """
     fields = []
     for f in converters.keys():
         fields.extend(f.split('->')[-1].split(','))
     return namedtuple('Item', fields)
 
 
-def _load(doc, key, converters, subset=None):
+def _parse(doc, key, converters, subset=None):
+    """
+    Parse item from a tuple or dict
+    :rtype: list
+    :param doc: Original document (tuple or dict)
+    :param key: Key of this document
+    :param converters: Field mapping rules
+    :param subset: Only parse a subset of fields. If subset is None, then parse the whole set
+    :return: Parsed item, fields not in subset set to None
+    """
     v = []
 
     for field_map, converter in converters.items():
@@ -64,16 +79,24 @@ class BaseLoader(object):
 
     def get(self, key):
         """
-        :rtype: Item
+        Get an data item. Returns None if not found
+        :rtype: namedtuple or NoneType
+        :param key: Data key
+        :return: Item or None
         """
         if key not in self.keys:
-            raise KeyError(key)
+            return None
         return self._get(key)
 
     @abstractmethod
     def _get(self, key): pass
 
     def epoch(self, batch_size):
+        """
+        Returns a generator of an epoch
+        :param batch_size: Size of each batch. The actual size may be smaller on conversion error or on last batch
+        :return: A generator, each time yields a batch
+        """
         n = int(math.ceil(self.size / batch_size))
 
         def loader():
@@ -89,6 +112,11 @@ class BaseLoader(object):
         return loader()
 
     def sample(self, frac):
+        """
+        Returns a random sample of items 
+        :param frac: Fraction of items to return
+        :return: A new loader with sampled keys
+        """
         rv = copy.copy(self)
         n = int(math.ceil(len(self.keys) * frac))
         rv._keys = random.sample(self.keys, n)
@@ -98,9 +126,19 @@ class BaseLoader(object):
         return rv
 
     def shuffle(self):
+        """
+        Returns a loader with item shuffled
+        :return: A new loader with item shuffled
+        """
         return self.sample(1.0)
 
     def split(self, frac, on=None):
+        """
+        Split items into two parts with ratio frac:(1-frac)
+        :param frac: Fraction of the first part
+        :param on: Field(s) to split on. When specified, same values in these fields won't be at both sides 
+        :return: Two loaders.
+        """
         left = copy.copy(self)
         right = copy.copy(self)
 
@@ -147,15 +185,30 @@ class BaseLoader(object):
 
     @property
     def keys(self):
+        """
+        Returns valid keys in this loader
+        :rtype: list
+        :return: A list of keys
+        """
         return self._keys
 
     @property
     def size(self):
+        """
+        Returns item count
+        :rtype: int
+        :return: Size of valid keys
+        """
         return len(self.keys)
 
     # noinspection PyPep8Naming
     @property
     def Item(self):
+        """
+        Returns item class of this loader
+        :rtype: namedtuple
+        :return: namedtuple for item
+        """
         if self._Item is None:
             return namedtuple('Item', [])
         else:
@@ -163,6 +216,11 @@ class BaseLoader(object):
 
     @property
     def fields(self):
+        """
+        Returns list of fields provided by this loader
+        :rtype: list
+        :return: List of available fields
+        """
         return self.Item._fields
 
     _keys = None
@@ -173,6 +231,10 @@ class BaseLoader(object):
     # noinspection PyPep8Naming
     @property
     def Index(self):
+        """
+        Return index type of this loader
+        :return: namedtuple for index
+        """
         if self._Index is None:
             return namedtuple('Index', [])
         else:
@@ -181,6 +243,10 @@ class BaseLoader(object):
 
 class DataLoader(BaseLoader):
     def __init__(self, *args):
+        """
+        Merge loaders with same keys
+        :param args: data loaders that share the same key field
+        """
         super(DataLoader, self).__init__()
         self._indices = OrderedDict()
         self._sources = args
@@ -217,6 +283,18 @@ class DataLoader(BaseLoader):
 
 class TableLoader(BaseLoader):
     def __init__(self, file, with_header=True, key=None, fields=None, index=None):
+        """
+        Loads text table separated by '\t'
+        :param file: path to table
+        :param with_header: Whether table has an extra header line. Without header, each line in data would be treated
+               as tuple, else as dict
+        :param key: Single object or callable. If key is a single object, then line[key] will be treated as key. If
+               key is callable, then key(line) will be the key. There can be multiple keys in a single line, if your
+               callable returns an iterable.
+        :param fields: A dict that describes field mapping rules. See examples to find out how to describe rules
+        :param index: Fields to build indices at. These fields should be small and hashable. Indices are used when
+               splitting the loader
+        """
         super(TableLoader, self).__init__()
         self._keys = []
         self._indices = OrderedDict()
@@ -256,7 +334,7 @@ class TableLoader(BaseLoader):
             doc = dict(doc)
         else:
             doc = tuple(doc)
-        item = self.Item(*_load(doc, key, fields, index))
+        item = self.Item(*_parse(doc, key, fields, index))
         item_dict = item._asdict()
         ind = self.Index(**{f: item_dict[f] for f in index})
         self._keys.append(key)
@@ -269,25 +347,32 @@ class TableLoader(BaseLoader):
             data = dict(data)
         else:
             data = tuple(data)
-        return self.Item(*_load(data, key, self._field_map))
+        return self.Item(*_parse(data, key, self._field_map))
 
 
 class DirectoryLoader(BaseLoader):
-    def __init__(self, dirname, fields=None, pattern=None):
+    def __init__(self, dirname, converters=None, pattern=None):
+        """
+        Loads files under directory
+        :param dirname: path to directory
+        :param converters: To set converter of files, pass converter or {'file': converter, ...} with other fields.
+        :param pattern: Regex to match file name. Use named groups in parallel with converters. Default pattern
+               is like: {key}.{ext}
+        """
         super(DirectoryLoader, self).__init__()
         self._keys = []
         self._indices = OrderedDict()
-        if not isinstance(fields, dict):
-            fields = {'file': fields, 'format': Converter}
+        if not isinstance(converters, dict):
+            converters = {'file': converters, 'ext': Converter}
         else:
-            fields = OrderedDict(fields)
+            converters = OrderedDict(converters)
         if pattern is None:
-            pattern = r'^(?P<key>.+)\.(?P<format>.+)$'
-        self._converter = fields['file']
-        fields['filename'] = Converter()
-        self._Item = _make_item_class(fields)
-        del fields['file']
-        self._Index = namedtuple('Index', fields.keys())
+            pattern = r'^(?P<key>.+)\.(?P<ext>.+)$'
+        self._converters = converters['file']
+        converters['filename'] = Converter()
+        self._Item = _make_item_class(converters)
+        del converters['file']
+        self._Index = namedtuple('Index', converters.keys())
 
         files = os.listdir(dirname)
         pattern = re.compile(pattern)
@@ -302,7 +387,7 @@ class DirectoryLoader(BaseLoader):
 
     def _get(self, key):
         ind = self._indices[key]
-        f = self._converter.apply(key, ind.filename)
+        f = self._converters.apply(key, ind.filename)
         item_dict = dict(**ind._asdict())
         item_dict['file'] = f
         return self.Item(**item_dict)

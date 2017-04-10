@@ -1,4 +1,4 @@
-"""Contains utilies for data manipulation."""
+"""Contains utilities for data manipulation."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -12,6 +12,9 @@ import numpy as np
 
 
 def foreach(func):
+    """
+    Decorator that enables an one-to-one function to apply on arrays with arbitrary depth  
+    """
     @functools.wraps(func)
     def wrapper(*args):
         item = args[-1]
