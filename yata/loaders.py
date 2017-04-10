@@ -10,11 +10,14 @@ from six.moves import range
 import math
 import copy
 import random
+import os
+import re
 import numpy as np
 import pandas as pd
 from abc import ABCMeta, abstractmethod
 from collections import Iterable, defaultdict, namedtuple, OrderedDict
 
+from .fields import Converter
 from .util import unique
 
 
@@ -79,7 +82,7 @@ class BaseLoader(object, metaclass=ABCMeta):
                 for k in keys:
                     data = self.get(k)
                     for k, v in data._asdict().items():
-                        rv[k].append(v)
+                        rv[k].append(np.asarray(v))
                 yield keys, {k: np.asarray(rv[k]) for k in rv}
 
         return loader()
@@ -261,3 +264,38 @@ class TableLoader(BaseLoader):
         else:
             data = tuple(data)
         return self.Item(*_load(data, key, self._field_map))
+
+
+class DirectoryLoader(BaseLoader):
+    def __init__(self, dirname, fields=None, pattern=None):
+        super().__init__()
+        if not isinstance(fields, dict):
+            fields = {'file': fields, 'format': Converter}
+        else:
+            fields = OrderedDict(fields)
+        if pattern is None:
+            pattern = r'^(?P<key>.+)\.(?P<format>.+)$'
+        self._converter = fields['file']
+        fields['filename'] = Converter()
+        self._Item = _make_item_class(fields)
+        del fields['file']
+        self._Index = namedtuple('Index', fields.keys())
+
+        files = os.listdir(dirname)
+        pattern = re.compile(pattern)
+        for filename in files:
+            for match in pattern.finditer(filename):
+                doc = match.groupdict()
+                print(doc)
+                key = doc['key']
+                self._keys.append(key)
+                del doc['key']
+                doc['filename'] = os.path.join(dirname, filename)
+                self._indices[key] = self.Index(**doc)
+
+    def _get(self, key):
+        ind = self._indices[key]
+        f = self._converter.apply(key, ind.filename)
+        item_dict = dict(**ind._asdict())
+        item_dict['file'] = f
+        return self.Item(**item_dict)

@@ -7,4 +7,7 @@ setup(name='yata',
       author_email='yxonic@gmail.com',
       url='https://github.com/yxonic/ydata',
       install_requires=['numpy', 'pandas', 'six'],
+      extras_require={
+          'image': ['pillow']
+      },
       packages=find_packages())

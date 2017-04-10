@@ -21,8 +21,10 @@ class Field:
 
 
 class Converter(Field):
-    def __init__(self, func):
-        if get_function_code(func).co_argcount == 1:
+    def __init__(self, func=None):
+        if func is None:
+            self._processor = lambda _, x: x
+        elif get_function_code(func).co_argcount == 1:
             self._processor = lambda _, x: func(x)
         else:
             self._processor = func
@@ -103,3 +105,21 @@ class Chars(Field):
                 else:
                     return rv + [null] * (length - len(rv))
             self._processor = foreach(check)
+
+
+class File(Field):
+    def __init__(self, mode='r'):
+        self._processor = foreach(lambda _, filename: open(filename, mode))
+
+
+class Image(Field):
+    def __init__(self, shape=None):
+        from PIL import Image
+
+        def open(file):
+            im = Image.open(file)
+            if shape is not None:
+                im = im.resize(shape)
+            return im
+
+        self._processor = foreach(lambda _, file: open(file))
