@@ -23,9 +23,9 @@ class Field:
 class Converter(Field):
     def __init__(self, func):
         if get_function_code(func).co_argcount == 1:
-            self._processor = foreach(lambda _, x: func(x))
+            self._processor = lambda _, x: func(x)
         else:
-            self._processor = foreach(func)
+            self._processor = func
 
 
 class Numeral(Field):
@@ -34,7 +34,9 @@ class Numeral(Field):
             self.dtype = 'float32'
         else:
             self.dtype = dtype
-        self._processor = foreach(lambda _, x: np.asarray(x, dtype=self.dtype))
+        if isinstance(self.dtype, str):
+            self.dtype = np.dtype(self.dtype).type
+        self._processor = foreach(lambda _, x: self.dtype(x))
 
 
 class Categorical(Field):

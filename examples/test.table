@@ -1,9 +1,9 @@
-id	content	label
-pic1	what:is:what	3
-pic2	what:is:what	3
-pic3	what:is:what	1
-pic4	what:is:what	5
-pic5	what:is:what	4
-pic6	what:is:what	3
-pic7	what:is:what	9
-pic8	what:is:what	0
+id	content	label	author
+pic1	what:is:what	3	yy
+pic2	what:is:what	3	yyy
+pic3	what:is:what	1	yy
+pic4	what:is:what	5	yy
+pic5	what:is:what	2	yy
+pic6	what:is:what	3	yyy
+pic7	what:is:what	5	yyy
+pic8	what:is:what	5	yyy

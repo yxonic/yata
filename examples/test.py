@@ -16,7 +16,7 @@ def get_context(key, line):
     return (left, right)
 
 
-if __name__ == '__main__':
+def main():
     word_cat = Categorical()
     text = word_cat(Words(':', 5))
 
@@ -26,7 +26,9 @@ if __name__ == '__main__':
 
     data1 = TableLoader('test.table', key='id',
                         fields={'label': label,
-                                'content->words': text})
+                                'content->words': text,
+                                'author': Converter(lambda x: x)},
+                        index=['label', 'author'])
 
     data2 = TableLoader('headless.table', with_header=False,
                         key=get_key,
@@ -40,12 +42,22 @@ if __name__ == '__main__':
     print('fields:', loader.fields)
     print()
 
-    for batch in loader.sample().epoch(4):
+    for batch in loader.shuffle().epoch(3):
         lc, rc = batch[1]['lc'], batch[1]['rc']
 
         a = batch[0]
         b = [''.join(char_cat.get_original(line)) for line in lc]
         c = [''.join(char_cat.get_original(line)) for line in rc]
 
+        print('new batch')
         for line in zip(a, b, c):
             print(line)
+
+    print()
+    left, right = loader.shuffle().split(0.5, on=['label', 'author'])
+    print(left.keys)
+    print(right.keys)
+
+
+if __name__ == '__main__':
+    main()
