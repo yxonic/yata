@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from six import itervalues, iteritems
 from six.moves import range
 
 import math
@@ -16,6 +17,7 @@ import numpy as np
 import pandas as pd
 from abc import ABCMeta, abstractmethod
 from collections import Iterable, defaultdict, namedtuple, OrderedDict
+from six import string_types, text_type
 
 from .fields import Converter
 from .util import unique
@@ -46,7 +48,7 @@ def _parse(doc, key, converters, subset=None):
     """
     v = []
 
-    for field_map, converter in converters.items():
+    for field_map, converter in iteritems(converters):
         if '->' in field_map:
             before, after = field_map.split('->')
         else:
@@ -105,7 +107,7 @@ class BaseLoader(object):
                 rv = defaultdict(list)
                 for key in keys:
                     data = self.get(key)
-                    for k, v in data._asdict().items():
+                    for k, v in iteritems(data._asdict()):
                         rv[k].append(np.asarray(v))
                 yield keys, {k: np.asarray(rv[k]) for k in rv}
 
@@ -147,13 +149,13 @@ class BaseLoader(object):
             left._keys = self._keys[:n]
             right._keys = self._keys[n:]
         else:
-            if not isinstance(on, Iterable) or isinstance(on, str):
+            if not isinstance(on, Iterable) or isinstance(on, string_types):
                 on = (on, )
 
             if set(on) > set(self.Index._fields):
                 raise KeyError('can only split on indexed fields')
 
-            indices = self._indices.values()
+            indices = itervalues(self._indices)
             value_list = self.Index(*(list(unique(x)) for x in zip(*indices)))
             left_set = dict()
             right_set = dict()
@@ -167,7 +169,7 @@ class BaseLoader(object):
             left._keys = []
             right._keys = []
 
-            for key, index in self._indices.items():
+            for key, index in iteritems(self._indices):
                 in_left = True
                 in_right = True
                 for on_ in on:
@@ -282,10 +284,10 @@ class DataLoader(BaseLoader):
 
 
 class TableLoader(BaseLoader):
-    def __init__(self, file, with_header=True, key=None, fields=None, index=None):
+    def __init__(self, filename, with_header=True, key=None, fields=None, index=None):
         """
         Loads text table separated by '\t'
-        :param file: path to table
+        :param filename: path to table
         :param with_header: Whether table has an extra header line. Without header, each line in data would be treated
                as tuple, else as dict
         :param key: Single object or callable. If key is a single object, then line[key] will be treated as key. If
@@ -309,7 +311,7 @@ class TableLoader(BaseLoader):
 
         self._with_header = with_header
 
-        df = pd.read_table(file, dtype=str,
+        df = pd.read_table(filename,  encoding='utf-8', dtype=text_type,
                            header='infer' if with_header else None)
         self._table = df
 

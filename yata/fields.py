@@ -7,10 +7,13 @@ from __future__ import unicode_literals
 
 from .util import foreach
 import numpy as np
-from six import get_function_code
+from six import get_function_code, text_type
 
 
 class Field:
+    def __init__(self):
+        pass
+
     _processor = None
 
     def __call__(self, other):
@@ -29,6 +32,7 @@ class Converter(Field):
         Wraps a function so that it can get chained with other converters
         :param func: Convert function. If None, the converter does nothing
         """
+        Field.__init__(self)
         if func is None:
             self._processor = lambda _, x: x
         elif get_function_code(func).co_argcount == 1:
@@ -43,6 +47,7 @@ class Numeral(Field):
         Convert to numeral type
         :param dtype: Data type to convert to, can be type or str
         """
+        Field.__init__(self)
         if dtype is None:
             self.dtype = 'float32'
         else:
@@ -58,6 +63,8 @@ class Categorical(Field):
         Maps sequences to ints
         :param null: Special token that maps to 0
         """
+        Field.__init__(self)
+        null = text_type(null)
         self._items = [null]
         self._map = {null: 0}
         self._fixed = False
@@ -71,6 +78,7 @@ class Categorical(Field):
         :param item: Any hashable item
         :return: Category index of this item
         """
+        item = text_type(item)
         try:
             return self._map[item]
         except KeyError:
@@ -120,11 +128,12 @@ class Words(Field):
         :param length: If None, length will be varied, else converted list will all be in same size
         :param null: Special token for null word
         """
+        Field.__init__(self)
         if length is None:
-            self._processor = foreach(lambda _, x: str(x).split(sep))
+            self._processor = foreach(lambda _, x: text_type(x).split(sep))
         else:
             def check(_, x):
-                rv = str(x).split(sep)
+                rv = text_type(x).split(sep)
                 if len(rv) > length:
                     return rv[:length]
                 else:
@@ -140,11 +149,12 @@ class Chars(Field):
         :param length: If None, length will be varied, else converted list will all be in same size
         :param null: Special token for null character
         """
+        Field.__init__(self)
         if length is None:
-            self._processor = foreach(lambda _, x: list(str(x)))
+            self._processor = foreach(lambda _, x: list(text_type(x)))
         else:
             def check(_, x):
-                rv = list(str(x))
+                rv = list(text_type(x))
                 if len(rv) > length:
                     return rv[:length]
                 else:
@@ -154,11 +164,13 @@ class Chars(Field):
 
 
 class File(Field):
+    # noinspection PyTypeChecker
     def __init__(self, mode='r'):
         """
         Convert file name to file object
         :param mode: Specifies the mode in which the file is opened
         """
+        Field.__init__(self)
         self._processor = foreach(lambda _, filename: open(filename, mode))
 
 
@@ -168,10 +180,11 @@ class Image(Field):
         Open file as PIL.Image
         :param shape: If not None, resize every image to this shape 
         """
+        Field.__init__(self)
         from PIL import Image
 
-        def open_image(file):
-            im = Image.open(file)
+        def open_image(filename):
+            im = Image.open(filename)
             if shape is not None:
                 im = im.resize(shape)
             return im

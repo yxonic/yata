@@ -8,6 +8,7 @@ from __future__ import unicode_literals
 import functools
 from collections import Iterable
 from six.moves import filterfalse
+from six import string_types
 import numpy as np
 
 
@@ -19,7 +20,7 @@ def foreach(func):
     def wrapper(*args):
         item = args[-1]
         if isinstance(item, Iterable) and \
-                not isinstance(item, str) and \
+                not isinstance(item, string_types) and \
                 not (isinstance(item, np.ndarray) and item.ndim == 0):
             rv = []
             for i in item:
