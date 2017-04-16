@@ -36,7 +36,7 @@ def _make_item_class(converters):
     return namedtuple('Item', fields)
 
 
-def _parse(doc, key, converters, subset=None):
+def _parse(doc, key, converters, subset=None, index=None):
     """
     Parse item from a tuple or dict
     :rtype: list
@@ -59,6 +59,12 @@ def _parse(doc, key, converters, subset=None):
             v.extend([None] * len(after.split(',')))
             continue
 
+        if index is not None and \
+                set(after.split(',')) <= set(index._fields):
+            for field in after.split(','):
+                v.append(index.__getattribute__(field))
+            continue
+
         if before == '':
             i = doc
         elif isinstance(doc, dict):
@@ -66,7 +72,10 @@ def _parse(doc, key, converters, subset=None):
         else:
             i = [doc[int(x)] for x in before.split(',')]
 
-        o = converter.apply(key, *i)
+        if not isinstance(i, string_types) and len(i) > 1:
+            o = converter.apply(key, i)
+        else:
+            o = converter.apply(key, i[0])
 
         if ',' in after:
             v.extend(o)
@@ -103,13 +112,23 @@ class BaseLoader(object):
 
         def loader():
             for i in range(n):
-                keys = self.keys[i*batch_size:(i+1)*batch_size]
-                rv = defaultdict(list)
-                for key in keys:
-                    data = self.get(key)
-                    for k, v in iteritems(data._asdict()):
+                keys = []
+                rv = []
+                for _ in range(len(self.Item._fields)):
+                    rv.append(list())
+                for key in self.keys[i*batch_size:(i+1)*batch_size]:
+                    try:
+                        data = self.get(key)
+                    except KeyboardInterrupt:
+                        raise
+                    except:
+                        continue
+                    if data is None:
+                        continue
+                    keys.append(key)
+                    for k, v in enumerate(data):
                         rv[k].append(np.asarray(v))
-                yield keys, {k: np.asarray(rv[k]) for k in rv}
+                yield keys, self.Item(*[np.array(x) for x in rv])
 
         return loader()
 
@@ -284,7 +303,7 @@ class DataLoader(BaseLoader):
 
 
 class TableLoader(BaseLoader):
-    def __init__(self, filename, with_header=True, key=None, fields=None, index=None):
+    def __init__(self, filename, with_header=True, key=None, fields=None, index=None, validate=False):
         """
         Loads text table separated by '\t'
         :param filename: path to table
@@ -310,6 +329,7 @@ class TableLoader(BaseLoader):
         self._field_map = fields
 
         self._with_header = with_header
+        self._validate = validate
 
         df = pd.read_table(filename,  encoding='utf-8', dtype=text_type,
                            header='infer' if with_header else None)
@@ -332,11 +352,12 @@ class TableLoader(BaseLoader):
     def __add_doc(self, i, key, doc):
         fields = self._field_map
         index = self.Index._fields
+        subset = None if self._validate else index
         if self._with_header:
             doc = dict(doc)
         else:
             doc = tuple(doc)
-        item = self.Item(*_parse(doc, key, fields, index))
+        item = self.Item(*_parse(doc, key, fields, subset=subset))
         item_dict = item._asdict()
         ind = self.Index(**{f: item_dict[f] for f in index})
         self._keys.append(key)
@@ -345,11 +366,12 @@ class TableLoader(BaseLoader):
 
     def _get(self, key):
         data = self._table.loc[self._loc[key]]
+        index = self._indices[key]
         if self._with_header:
             data = dict(data)
         else:
             data = tuple(data)
-        return self.Item(*_parse(data, key, self._field_map))
+        return self.Item(*_parse(data, key, self._field_map, index=index))
 
 
 class DirectoryLoader(BaseLoader):
