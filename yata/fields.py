@@ -58,12 +58,13 @@ class Numeral(Field):
 
 
 class Categorical(Field):
-    def __init__(self, null='<NULL>'):
+    def __init__(self, null='<NULL>', one_hot=False):
         """
         Maps sequences to ints
         :param null: Special token that maps to 0
         """
         Field.__init__(self)
+        self._one_hot = one_hot
         null = text_type(null)
         self._items = [null]
         self._map = {null: 0}
@@ -71,24 +72,34 @@ class Categorical(Field):
         self._processor = foreach(lambda _, x: self.to_categorical(x))
 
     @foreach
-    def to_categorical(self, item):
+    def to_categorical(self, item, one_hot=None):
         """
         Maps an item to int
         :rtype: int
         :param item: Any hashable item
+        :param one_hot: Whether returns index or one-hotted array
         :return: Category index of this item
         """
         item = text_type(item)
         try:
-            return self._map[item]
+            cat = self._map[item]
         except KeyError:
             if self._fixed:
-                return 0  # for null
+                cat = 0  # for null
             else:
-                i = len(self._items)
+                cat = len(self._items)
                 self._items.append(item)
-                self._map[item] = i
-                return i
+                self._map[item] = cat
+        if one_hot is None:
+            one_hot = self._one_hot
+        if one_hot:
+            if not self._fixed:
+                raise ValueError('can\'t return one hot result with varying size')
+            a = np.zeros((self.count,), dtype='int32')
+            a[cat] = 1
+            return a
+        else:
+            return cat
 
     @foreach
     def get_original(self, cat):
@@ -108,6 +119,13 @@ class Categorical(Field):
         Items in order of their category index
         """
         return self._items
+
+    @property
+    def count(self):
+        """
+        Number of different categories
+        """
+        return len(self._items)
 
     def load_dict(self, items):
         """
@@ -164,7 +182,6 @@ class Chars(Field):
 
 
 class File(Field):
-    # noinspection PyTypeChecker
     def __init__(self, mode='r'):
         """
         Convert file name to file object
@@ -175,7 +192,7 @@ class File(Field):
 
 
 class Image(Field):
-    def __init__(self, shape=None):
+    def __init__(self, shape=None, gray_scale=False):
         """
         Open file as PIL.Image
         :param shape: If not None, resize every image to this shape 
@@ -187,6 +204,8 @@ class Image(Field):
             im = Image.open(filename)
             if shape is not None:
                 im = im.resize(shape)
+            if gray_scale:
+                im = im.convert('L')
             return im
 
-        self._processor = foreach(lambda _, file: open_image(file))
+        self._processor = foreach(lambda _, f: open_image(f))
