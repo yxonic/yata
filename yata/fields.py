@@ -201,6 +201,8 @@ class Image(Field):
         from PIL import Image
 
         def _alpha_to_color(image, color=(255, 255, 255)):
+            if len(image.split()) < 4:
+                return image
             image.load()
             background = Image.new('RGB', image.size, color)
             background.paste(image, mask=image.split()[3])
@@ -212,6 +214,6 @@ class Image(Field):
                 im = im.resize(shape)
             if gray_scale:
                 im = im.convert('L')
-            return 1 - np.asarray(im) / 255.0
+            return im
 
         self._processor = foreach(lambda _, f: open_image(f))

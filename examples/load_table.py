@@ -27,7 +27,7 @@ def main():
     data1 = TableLoader('tables/test.table', key='id',
                         fields={'label': label,
                                 'content->words': text,
-                                'author': Converter(lambda x: x)},
+                                'author': Converter()},
                         index=['label', 'author'])
 
     data2 = TableLoader('tables/headless.table', with_header=False,
@@ -43,7 +43,7 @@ def main():
     print()
 
     for batch in loader.shuffle().epoch(3):
-        lc, rc = batch[1]['lc'], batch[1]['rc']
+        lc, rc = batch[1].lc, batch[1].rc
 
         a = batch[0]
         b = [''.join(char_cat.get_original(line)) for line in lc]
