@@ -16,7 +16,7 @@ import re
 import numpy as np
 import pandas as pd
 from abc import ABCMeta, abstractmethod
-from collections import Iterable, defaultdict, namedtuple, OrderedDict
+from collections import Iterable, namedtuple, OrderedDict
 from six import string_types, text_type
 
 from .fields import Converter
@@ -128,6 +128,8 @@ class BaseLoader(object):
                     keys.append(key)
                     for k, v in enumerate(data):
                         rv[k].append(np.asarray(v))
+                if len(keys) == 0:
+                    continue
                 yield keys, self.Item(*[np.array(x) for x in rv])
 
         return loader()
@@ -158,7 +160,7 @@ class BaseLoader(object):
         Split items into two parts with ratio frac:(1-frac)
         :param frac: Fraction of the first part
         :param on: Field(s) to split on. When specified, same values in these fields won't be at both sides 
-        :return: Two loaders.
+        :return: Two loaders
         """
         left = copy.copy(self)
         right = copy.copy(self)
@@ -203,6 +205,19 @@ class BaseLoader(object):
                     right._keys.append(key)
 
         return left, right
+
+    def filter(self, function):
+        """
+        Returns items on which function returns True
+        :param function: Filter function
+        :return: A new loader with only filtered items
+        """
+        rv = copy.copy(self)
+        rv._keys = [x for x in self._keys if function(self._indices[x])]
+        rv._indices = OrderedDict()
+        for k in rv.keys:
+            rv._indices[k] = self._indices[k]
+        return rv
 
     @property
     def keys(self):
@@ -357,7 +372,14 @@ class TableLoader(BaseLoader):
             doc = dict(doc)
         else:
             doc = tuple(doc)
-        item = self.Item(*_parse(doc, key, fields, subset=subset))
+        try:
+            item = self.Item(*_parse(doc, key, fields, subset=subset))
+        except KeyboardInterrupt:
+            raise
+        except:
+            return
+        if item is None:
+            return
         item_dict = item._asdict()
         ind = self.Index(**{f: item_dict[f] for f in index})
         self._keys.append(key)
