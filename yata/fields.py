@@ -132,7 +132,7 @@ class Categorical(Field):
         Use a list to specify mapping dict. After load_dict, items not in dict would be mapped to 0 
         :param items: Item list
         """
-        self._items = items
+        self._items = list(items)
         for i, w in enumerate(self._items):
             self._map[w] = i
         self._fixed = True
@@ -200,12 +200,18 @@ class Image(Field):
         Field.__init__(self)
         from PIL import Image
 
+        def _alpha_to_color(image, color=(255, 255, 255)):
+            image.load()
+            background = Image.new('RGB', image.size, color)
+            background.paste(image, mask=image.split()[3])
+            return background
+
         def open_image(filename):
-            im = Image.open(filename)
+            im = _alpha_to_color(Image.open(filename))
             if shape is not None:
                 im = im.resize(shape)
             if gray_scale:
                 im = im.convert('L')
-            return im
+            return 1 - np.asarray(im) / 255.0
 
         self._processor = foreach(lambda _, f: open_image(f))
