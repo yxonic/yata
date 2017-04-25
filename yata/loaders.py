@@ -16,7 +16,7 @@ import re
 import numpy as np
 import pandas as pd
 from abc import ABCMeta, abstractmethod
-from collections import Iterable, namedtuple, OrderedDict
+from collections import Iterable, namedtuple, OrderedDict, defaultdict
 from six import string_types, text_type
 
 from .fields import Converter
@@ -88,6 +88,9 @@ def _parse(doc, key, converters, subset=None, index=None):
 class BaseLoader(object):
     __metaclass__ = ABCMeta
 
+    def __init__(self):
+        self._key_set = None
+
     def get(self, key):
         """
         Get an data item. Returns None if not found
@@ -95,7 +98,7 @@ class BaseLoader(object):
         :param key: Data key
         :return: Item or None
         """
-        if key not in self.keys:
+        if key not in self.key_set:
             return None
         return self._get(key)
 
@@ -121,8 +124,6 @@ class BaseLoader(object):
                         data = self.get(key)
                     except KeyboardInterrupt:
                         raise
-                    except:
-                        continue
                     if data is None:
                         continue
                     keys.append(key)
@@ -141,6 +142,7 @@ class BaseLoader(object):
         :return: A new loader with sampled keys
         """
         rv = copy.copy(self)
+        rv._key_set = None
         n = int(math.ceil(len(self.keys) * frac))
         rv._keys = random.sample(self.keys, n)
         rv._indices = OrderedDict()
@@ -164,6 +166,8 @@ class BaseLoader(object):
         """
         left = copy.copy(self)
         right = copy.copy(self)
+        left._key_set = None
+        right._key_set = None
 
         if on is None:
             n = int(len(self.keys) * frac)
@@ -176,12 +180,15 @@ class BaseLoader(object):
             if set(on) > set(self.Index._fields):
                 raise KeyError('can only split on indexed fields')
 
-            indices = itervalues(self._indices)
-            value_list = self.Index(*(list(unique(x)) for x in zip(*indices)))
+            value_list = defaultdict(list)
+            for index in itervalues(self._indices):
+                for on_ in on:
+                    value_list[on_].append(index.__getattribute__(on_))
+            value_list = {on: list(unique(value_list[on])) for on in value_list}
             left_set = dict()
             right_set = dict()
             for on_ in on:
-                l = value_list.__getattribute__(on_)
+                l = value_list.get(on_)
                 n = int(math.ceil(len(l) * frac))
 
                 left_set[on_] = set(l[:n])
@@ -213,6 +220,7 @@ class BaseLoader(object):
         :return: A new loader with only filtered items
         """
         rv = copy.copy(self)
+        rv._key_set = None
         rv._keys = [x for x in self._keys if function(self._indices[x])]
         rv._indices = OrderedDict()
         for k in rv.keys:
@@ -227,6 +235,17 @@ class BaseLoader(object):
         :return: A list of keys
         """
         return self._keys
+
+    @property
+    def key_set(self):
+        """
+        Returns valid key set in this loader
+        :rtype: set
+        :return: Set of keys
+        """
+        if self._key_set is None:
+            self._key_set = set(self._keys)
+        return self._key_set
 
     @property
     def size(self):
@@ -299,7 +318,7 @@ class DataLoader(BaseLoader):
             item_fields.extend(source.Item._fields)
             index_fields.extend(source.Index._fields)
 
-        self._keys = sorted(keys)
+        self._keys = [k for k in self._sources[0].keys if k in keys]
         self._Item = namedtuple('Item', item_fields, rename=True)
         self._Index = namedtuple('Index', index_fields, rename=True)
 
@@ -346,7 +365,7 @@ class TableLoader(BaseLoader):
         self._with_header = with_header
         self._validate = validate
 
-        df = pd.read_table(filename,  encoding='utf-8', dtype=text_type,
+        df = pd.read_table(filename, encoding='utf-8', dtype=text_type,
                            header='infer' if with_header else None)
         self._table = df
 
@@ -387,7 +406,7 @@ class TableLoader(BaseLoader):
         self._loc[key] = i
 
     def _get(self, key):
-        data = self._table.loc[self._loc[key]]
+        data = self._table.iloc[self._loc[key]]
         index = self._indices[key]
         if self._with_header:
             data = dict(data)

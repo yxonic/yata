@@ -14,7 +14,7 @@ import numpy as np
 
 def foreach(func):
     """
-    Decorator that enables an one-to-one function to apply on arrays with arbitrary depth  
+    Decorator that enables an one-to-one function to apply to an item or an array
     """
     @functools.wraps(func)
     def wrapper(*args):
@@ -24,7 +24,7 @@ def foreach(func):
                 not (isinstance(item, np.ndarray) and item.ndim == 0):
             rv = []
             for i in item:
-                rv.append(wrapper(*(args[:-1] + (i,))))
+                rv.append(func(*(args[:-1] + (i,))))
             return np.asarray(rv)
         else:
             return func(*args)
