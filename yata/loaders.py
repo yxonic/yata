@@ -103,7 +103,8 @@ class BaseLoader(object):
         return self._get(key)
 
     @abstractmethod
-    def _get(self, key): pass
+    def _get(self, key):
+        pass
 
     def epoch(self, batch_size):
         """
@@ -126,9 +127,13 @@ class BaseLoader(object):
                         raise
                     if data is None:
                         continue
-                    keys.append(key)
-                    for k, v in enumerate(data):
-                        rv[k].append(np.asarray(v))
+                    for v in data:
+                        if v is None:
+                            break
+                    else:
+                        for k, v in enumerate(data):
+                            rv[k].append(np.asarray(v))
+                        keys.append(key)
                 if len(keys) == 0:
                     continue
                 yield keys, self.Item(*[np.array(x) for x in rv])

@@ -58,7 +58,7 @@ class Numeral(Field):
 
 
 class Categorical(Field):
-    def __init__(self, null='<NULL>', one_hot=False):
+    def __init__(self, null='<NULL>', one_hot=False, max_size=None):
         """
         Maps sequences to ints
         :param null: Special token that maps to 0
@@ -69,6 +69,7 @@ class Categorical(Field):
         self._items = [null]
         self._map = {null: 0}
         self._fixed = False
+        self._max_size = max_size
         self._processor = foreach(lambda _, x: self.to_categorical(x))
 
     @foreach
@@ -90,12 +91,18 @@ class Categorical(Field):
                 cat = len(self._items)
                 self._items.append(item)
                 self._map[item] = cat
+                if cat + 1 == self._max_size:
+                    self._fixed = True
         if one_hot is None:
             one_hot = self._one_hot
         if one_hot:
-            if not self._fixed:
+            if not self._fixed and self._max_size is None:
                 raise ValueError('can\'t return one hot result with varying size')
-            a = np.zeros((self.count,), dtype='int32')
+            if self._max_size is not None:
+                sz = self._max_size
+            else:
+                sz = self.count
+            a = np.zeros((sz,), dtype='uint8')
             a[cat] = 1
             return a
         else:
@@ -191,6 +198,15 @@ class File(Field):
         self._processor = foreach(lambda _, filename: open(filename, mode))
 
 
+def _alpha_to_color(Image, image, color=(255, 255, 255)):
+    if len(image.split()) < 4:
+        return image
+    image.load()
+    background = Image.new('RGB', image.size, color)
+    background.paste(image, mask=image.split()[3])
+    return background
+
+
 class Image(Field):
     def __init__(self, shape=None, gray_scale=False):
         """
@@ -200,16 +216,11 @@ class Image(Field):
         Field.__init__(self)
         from PIL import Image
 
-        def _alpha_to_color(image, color=(255, 255, 255)):
-            if len(image.split()) < 4:
-                return image
-            image.load()
-            background = Image.new('RGB', image.size, color)
-            background.paste(image, mask=image.split()[3])
-            return background
-
         def open_image(filename):
-            im = _alpha_to_color(Image.open(filename))
+            try:
+                im = _alpha_to_color(Image, Image.open(filename))
+            except:
+                return None
             if shape is not None:
                 im = im.resize(shape)
             if gray_scale:
