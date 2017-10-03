@@ -6,7 +6,6 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from .util import foreach
-import numpy as np
 from six import get_function_code, text_type
 
 
@@ -49,11 +48,9 @@ class Numeral(Field):
         """
         Field.__init__(self)
         if dtype is None:
-            self.dtype = 'float32'
+            self.dtype = float
         else:
             self.dtype = dtype
-        if isinstance(self.dtype, str):
-            self.dtype = np.dtype(self.dtype).type
         self._processor = foreach(lambda _, x: self.dtype(x))
 
 
@@ -102,7 +99,7 @@ class Categorical(Field):
                 sz = self._max_size
             else:
                 sz = self.count
-            a = np.zeros((sz,), dtype='uint8')
+            a = [0] * sz
             a[cat] = 1
             return a
         else:

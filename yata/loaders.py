@@ -5,6 +5,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+
+from operator import itemgetter
+
 from six import itervalues, iteritems
 from six.moves import range
 
@@ -13,14 +16,14 @@ import copy
 import random
 import os
 import re
-import numpy as np
+
 import pandas as pd
 from abc import ABCMeta, abstractmethod
 from collections import Iterable, namedtuple, OrderedDict, defaultdict
 from six import string_types, text_type
 
 from .fields import Converter
-from .util import unique
+from .util import unique, inner_type
 
 
 def _make_item_class(converters):
@@ -106,37 +109,121 @@ class BaseLoader(object):
     def _get(self, key):
         pass
 
-    def epoch(self, batch_size):
+    def epoch(self, batch_size, backend='numpy'):
         """
         Returns a generator of an epoch
         :param batch_size: Size of each batch. The actual size may be smaller on conversion error or on last batch
+        :param backend: 'np' or 'torch'
         :return: A generator, each time yields a batch
         """
         n = int(math.ceil(self.size / batch_size))
 
-        def loader():
-            for i in range(n):
-                keys = []
-                rv = []
-                for _ in range(len(self.Item._fields)):
-                    rv.append(list())
-                for key in self.keys[i*batch_size:(i+1)*batch_size]:
-                    try:
-                        data = self.get(key)
-                    except KeyboardInterrupt:
-                        raise
-                    if data is None:
+        if backend == 'numpy':
+            import numpy as np
+
+            def loader():
+                for i in range(n):
+                    keys = []
+                    rv = []
+                    for _ in range(len(self.Item._fields)):
+                        rv.append(list())
+                    for key in self.keys[i*batch_size:(i+1)*batch_size]:
+                        try:
+                            data = self.get(key)
+                        except KeyboardInterrupt:
+                            raise
+                        if data is None:
+                            continue
+                        for v in data:
+                            if v is None:
+                                break
+                        else:
+                            for k, v in enumerate(data):
+                                rv[k].append(np.asarray(v))
+                            keys.append(key)
+                    if len(keys) == 0:
                         continue
-                    for v in data:
-                        if v is None:
-                            break
-                    else:
-                        for k, v in enumerate(data):
-                            rv[k].append(np.asarray(v))
-                        keys.append(key)
-                if len(keys) == 0:
-                    continue
-                yield keys, self.Item(*[np.array(x) for x in rv])
+                    yield keys, self.Item(*[np.array(x) for x in rv])
+        else:
+            import torch
+            from PIL import Image
+
+            def loader():
+                for i in range(n):
+                    keys = []
+                    rv = []
+                    for _ in range(len(self.Item._fields)):
+                        rv.append(list())
+                    for key in self.keys[i*batch_size:(i+1)*batch_size]:
+                        try:
+                            data = self.get(key)
+                        except KeyboardInterrupt:
+                            raise
+                        if data is None:
+                            continue
+                        for v in data:
+                            if v is None:
+                                break
+                        else:
+                            for k, v in enumerate(data):
+                                rv[k].append(v)
+                            keys.append(key)
+                    if len(keys) == 0:
+                        continue
+                    items = []
+                    lens = None
+                    for x in rv:
+                        if type(x[0]) == Image.Image:
+                            size = (x[0].size[1], x[0].size[0], -1)
+                            items.append([
+                                torch.FloatTensor(item.tobytes())
+                                     .view(*size)
+                                     .permute(2, 0, 1)
+                                for item in x
+                            ])
+                        elif type(x[0]) == list:
+                            if type(x[0][0]) == int:
+                                Tensor = torch.LongTensor
+                            elif inner_type(x) == float:
+                                Tensor = torch.FloatTensor
+                            else:
+                                Tensor = lambda x: x
+                            lens = [len(item) for item in x]
+                            if max(lens) != min(lens):
+                                padded = []
+                                max_len = max(lens)
+                                for item in x:
+                                    l = len(item)
+                                    item = Tensor(item)
+                                    if torch.is_tensor(item) and \
+                                            item.size()[0] < max_len:
+                                        zsize = list(item.size())
+                                        zsize[0] = max_len - zsize[0]
+                                        item = torch.cat([item,
+                                                          torch.zeros(*zsize)
+                                                          .type_as(item)],
+                                                         dim=0)
+                                    padded.append((item, l))
+                                items.append(padded)
+                            else:
+                                lens = None
+                                items.append([Tensor(item) for item in x])
+                        else:
+                            items.append(x)
+                    if lens is not None:
+                        keys = [k for k, l in sorted(zip(keys, lens),
+                                                     key=itemgetter(1),
+                                                     reverse=True)]
+                        nitems = []
+                        for item in items:
+                            nitems.append([k for k, l in
+                                           sorted(zip(item, lens),
+                                                  key=itemgetter(1),
+                                                  reverse=True)])
+                        items = nitems
+                    print(items)
+
+                    yield keys, self.Item(*items)
 
         return loader()
 
@@ -442,7 +529,7 @@ class DirectoryLoader(BaseLoader):
         converters['filename'] = Converter()
         self._Item = _make_item_class(converters)
         del converters['file']
-        self._Index = namedtuple('Index', converters.keys())
+        self._Index = namedtuple('_Index', converters.keys())
 
         files = os.listdir(dirname)
         pattern = re.compile(pattern)
@@ -453,7 +540,7 @@ class DirectoryLoader(BaseLoader):
                 self._keys.append(key)
                 del doc['key']
                 doc['filename'] = os.path.join(dirname, filename)
-                self._indices[key] = self.Index(**doc)
+                self._indices[key] = self._Index(**doc)
 
     def _get(self, key):
         ind = self._indices[key]

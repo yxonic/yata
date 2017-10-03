@@ -6,8 +6,10 @@ setup(name='yata',
       author='Yu Yin',
       author_email='yxonic@gmail.com',
       url='https://github.com/yxonic/ydata',
-      install_requires=['numpy', 'pandas', 'six'],
+      install_requires=['pandas', 'six'],
       extras_require={
-          'image': ['pillow']
+          'image': ['pillow'],
+          'numpy': ['numpy'],
+          'torch': ['torch']
       },
       packages=find_packages())

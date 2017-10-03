@@ -42,7 +42,7 @@ def main():
     print('fields:', loader.fields)
     print()
 
-    for batch in loader.shuffle().epoch(3):
+    for batch in loader.shuffle().epoch(3, backend='torch'):
         lc, rc = batch[1].lc, batch[1].rc
 
         a = batch[0]

@@ -25,10 +25,19 @@ def foreach(func):
             rv = []
             for i in item:
                 rv.append(func(*(args[:-1] + (i,))))
-            return np.asarray(rv)
+            return rv
         else:
             return func(*args)
     return wrapper
+
+
+def inner_type(item):
+    if isinstance(item, Iterable) and \
+            not isinstance(item, string_types) and \
+            not (isinstance(item, np.ndarray) and item.ndim == 0):
+        return inner_type(next(item))
+    else:
+        return type(item)
 
 
 def unique(iterable, key=None):
