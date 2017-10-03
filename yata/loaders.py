@@ -221,9 +221,23 @@ class BaseLoader(object):
                                                   key=itemgetter(1),
                                                   reverse=True)])
                         items = nitems
-                    print(items)
 
-                    yield keys, self.Item(*items)
+                    nitems = []
+                    for item in items:
+                        if torch.is_tensor(item[0]):
+                            nitems.append(
+                                torch.cat([x.unsqueeze(0) for x in item])
+                            )
+                        elif type(item[0]) == tuple and \
+                                torch.is_tensor(item[0][0]):
+                            nitems.append((
+                                torch.cat([x[0].unsqueeze(0) for x in item]),
+                                [x[1] for x in item]
+                            ))
+                        else:
+                            nitems.append(item)
+
+                    yield keys, self.Item(*nitems)
 
         return loader()
 
