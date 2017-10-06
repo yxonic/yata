@@ -146,6 +146,7 @@ class BaseLoader(object):
                     yield keys, self.Item(*[np.array(x) for x in rv])
         else:
             import torch
+            import torchvision.transforms as transforms
             from PIL import Image
 
             def loader():
@@ -174,11 +175,8 @@ class BaseLoader(object):
                     lens = None
                     for x in rv:
                         if type(x[0]) == Image.Image:
-                            size = (x[0].size[1], x[0].size[0], -1)
                             items.append([
-                                torch.FloatTensor(item.tobytes())
-                                     .view(*size)
-                                     .permute(2, 0, 1)
+                                transforms.ToTensor()(item)
                                 for item in x
                             ])
                         elif type(x[0]) == list:
