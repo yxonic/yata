@@ -196,12 +196,19 @@ class File(Field):
 
 
 def _alpha_to_color(Image, image, color=(255, 255, 255)):
-    if len(image.split()) < 4:
-        return image
     image.load()
-    background = Image.new('RGB', image.size, color)
-    background.paste(image, mask=image.split()[3])
-    return background
+    if len(image.split()) == 4:
+        background = Image.new('RGB', image.size, color)
+        background.paste(image, mask=image.split()[3])
+        return background
+    elif len(image.split()) == 2:
+        if isinstance(color, tuple):
+            color = 255
+        background = Image.new('L', image.size, color)
+        background.paste(image, mask=image.split()[1])
+        return background
+    else:
+        return image
 
 
 class Image(Field):
