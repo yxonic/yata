@@ -212,7 +212,8 @@ def _alpha_to_color(Image, image, color=(255, 255, 255)):
 
 
 class Image(Field):
-    def __init__(self, shape=None, gray_scale=False):
+    def __init__(self, shape=None, gray_scale=False,
+                 crop=False, color=(255, 255, 255)):
         """
         Open file as PIL.Image
         :param shape: If not None, resize every image to this shape 
@@ -226,7 +227,12 @@ class Image(Field):
             except:
                 return None
             if shape is not None:
-                im = im.resize(shape)
+                if crop:
+                    bg = Image.new('RGB', shape, color)
+                    bg.paste(im)
+                    im = bg
+                else:
+                    im = im.resize(shape)
             if gray_scale:
                 im = im.convert('L')
             return im
