@@ -105,6 +105,15 @@ class BaseLoader(object):
             return None
         return self._get(key)
 
+    def __getitem__(self, key):
+        """
+        Get an data item. Raise KeyError if not found
+        :rtype: namedtuple
+        :param key: Data key
+        :return: Item
+        """
+        return self._get(key)
+
     @abstractmethod
     def _get(self, key):
         pass
@@ -167,7 +176,7 @@ class BaseLoader(object):
                                 break
                         else:
                             for k, v in enumerate(data):
-                                rv[k].append(v)
+                              rv[k].append(v)
                             keys.append(key)
                     if len(keys) == 0:
                         continue
@@ -247,7 +256,10 @@ class BaseLoader(object):
         """
         rv = copy.copy(self)
         rv._key_set = None
-        n = int(math.ceil(len(self.keys) * frac))
+        if isinstance(frac, float):
+            n = int(math.ceil(len(self.keys) * frac))
+        else:
+            n = frac
         rv._keys = random.sample(self.keys, n)
         rv._indices = OrderedDict()
         for k in rv.keys:

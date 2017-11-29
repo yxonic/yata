@@ -35,7 +35,7 @@ def inner_type(item):
     if isinstance(item, Iterable) and \
             not isinstance(item, string_types) and \
             not (isinstance(item, np.ndarray) and item.ndim == 0):
-        return inner_type(next(item))
+        return inner_type(next(iter(item)))
     else:
         return type(item)
 
