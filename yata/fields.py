@@ -229,7 +229,7 @@ class Image(Field):
             if shape is not None:
                 if crop:
                     bg = Image.new('RGB', shape, color)
-                    bg.paste(im)
+                    bg.paste(im, (0, 0, im.size[-2], im.size[-1]))
                     im = bg
                 else:
                     im = im.resize(shape)
