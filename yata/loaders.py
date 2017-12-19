@@ -16,6 +16,7 @@ import copy
 import random
 import os
 import re
+import csv
 
 import pandas as pd
 from abc import ABCMeta, abstractmethod
@@ -483,7 +484,7 @@ class TableLoader(BaseLoader):
 
         df = pd.read_table(filename, encoding='utf-8', dtype=text_type,
                            header='infer' if with_header else None,
-                           error_bad_lines=False)
+                           error_bad_lines=False, quoting=csv.QUOTE_NONE)
         self._table = df
 
         self._Item = _make_item_class(fields)
