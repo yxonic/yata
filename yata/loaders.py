@@ -482,7 +482,8 @@ class TableLoader(BaseLoader):
         self._validate = validate
 
         df = pd.read_table(filename, encoding='utf-8', dtype=text_type,
-                           header='infer' if with_header else None)
+                           header='infer' if with_header else None,
+                           error_bad_lines=False)
         self._table = df
 
         self._Item = _make_item_class(fields)
